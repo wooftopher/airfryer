@@ -30,6 +30,7 @@ Input Keypad::getKey() {
     }
 }
 
+
 void Keypad::update() {
     Input key = getKey();
 

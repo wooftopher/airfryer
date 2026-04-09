@@ -3,6 +3,10 @@
 #include <thread>
 #include <chrono>
 
+#include <queue>
+#include <mutex>
+#include <thread>
+
 #include "device.hpp"
 #include "keypad.hpp"
 #include "heater.hpp"
@@ -23,7 +27,7 @@ struct SystemState {
 
 void resetSystem(SystemState& state, Heater& heater) {
     state.heating = false;
-    state.targetTemp = 0;
+    state.targetTemp = 25;
     state.targetTime = 0;
     state.inputBuffer = 0;
     state.enteringTemp = false;
@@ -100,23 +104,54 @@ void handleInput(Input input, SystemState& state, Heater& heater) {
     }
 }
 
+std::queue<Input> eventQueue;
+std::mutex queueMutex;
+std::atomic<bool> running = true;
+
+
+void inputThread(Keypad& keypad) {
+    while (running) {
+        Input in = keypad.getKey(); // blocking is OK HERE
+
+        std::lock_guard<std::mutex> lock(queueMutex);
+        eventQueue.push(in);
+    }
+}
+
 int main() {
     Keypad keypad;
     Heater heater;
-
     SystemState state;
+
+    std::thread t(inputThread, std::ref(keypad));
+
+    auto lastPrint = std::chrono::steady_clock::now();
 
     while (true) {
 
-        Input input = static_cast<Input>(keypad.getKey());
+        // 🔥 process "interrupts"
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
 
-        handleInput(input, state, heater);
+            while (!eventQueue.empty()) {
+                Input input = eventQueue.front();
+                eventQueue.pop();
+
+                handleInput(input, state, heater);
+            }
+        }
 
         heater.update();
 
-        int temp = heater.getTemp();
-        std::cout << "TEMP: " << temp << std::endl;
+        auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastPrint).count() >= 3) {
+            std::cout << "TEMP: " << heater.getTemp() << std::endl;
+            lastPrint = now;
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
+
+    running = false;
+    t.join();
 }
