@@ -1,11 +1,12 @@
 #pragma once
 
-#include "device.hpp"
-
-class Heater : public Device {
+class Heater {
 public:
     void setTargetTemp(int temp);
     int getTemp();
+    void update();
 
-    void update() override;
+private:
+    int currentTemp = 25;
+    int targetTemp = 25;
 };

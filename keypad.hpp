@@ -1,28 +1,17 @@
 #pragma once
 
+#include <cstdint>
+#include "device.hpp"
+
 enum class Input {
     NONE,
     POWER,
     START,
     STOP,
-    SET_TEMP,
-    SET_TIME,
-    ENTER,
-
-    DIGIT_0,
-    DIGIT_1,
-    DIGIT_2,
-    DIGIT_3,
-    DIGIT_4,
-    DIGIT_5,
-    DIGIT_6,
-    DIGIT_7,
-    DIGIT_8,
-    DIGIT_9
+    SET_TEMP_50,
+    SET_TEMP_100,
+    SET_TEMP_150,
 };
-
-#include <cstdint>
-#include "device.hpp"
 
 class Keypad : public Device {
 public:

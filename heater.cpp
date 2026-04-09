@@ -1,8 +1,5 @@
 #include "heater.hpp"
 
-static int currentTemp = 25;
-static int targetTemp = 25;
-
 void Heater::setTargetTemp(int temp) {
     targetTemp = temp;
 }
@@ -14,7 +11,13 @@ int Heater::getTemp() {
 void Heater::update() {
     if (currentTemp < targetTemp) {
         currentTemp++;
-    } else if (currentTemp > targetTemp) {
+    } 
+    else if (currentTemp > targetTemp) {
         currentTemp--;
+    }
+
+    // 🔥 safety clamp (ambient temperature)
+    if (currentTemp < 25) {
+        currentTemp = 25;
     }
 }

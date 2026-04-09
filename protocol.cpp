@@ -5,44 +5,62 @@
 // UART
 //
 
-void UART::send(const std::string& msg) {
-    std::cout << "[UART SEND] " << msg << std::endl;
-    buffer = msg;
+void UART::send(const std::string& msg)
+{
+    std::cout << "[UART TX] " << msg << std::endl;
 }
 
-std::string UART::receive() {
-    std::cout << "[UART RECEIVE]" << std::endl;
-    return buffer;
+void UART::injectRX(const std::string& msg)
+{
+    std::cout << "[UART RX INJECT] " << msg << std::endl;
+    rxQueue.push(msg);
 }
 
-//
-// I2C
-//
-
-void I2C::write(uint8_t address, uint8_t data) {
-    std::cout << "[I2C WRITE] Addr: " << static_cast<int>(address)
-              << " Data: " << static_cast<int>(data) << std::endl;
-
-    memory[address] = data;
+bool UART::available()
+{
+    return !rxQueue.empty();
 }
 
-uint8_t I2C::read(uint8_t address) {
-    std::cout << "[I2C READ] Addr: " << static_cast<int>(address)
-              << " Data: " << static_cast<int>(memory[address]) << std::endl;
+std::string UART::read()
+{
+    if (rxQueue.empty())
+        return "";
 
-    return memory[address];
+    std::string msg = rxQueue.front();
+    rxQueue.pop();
+
+    std::cout << "[UART READ] " << msg << std::endl;
+    return msg;
 }
 
-//
-// SPI
-//
+// //
+// // I2C
+// //
 
-uint8_t SPI::transfer(uint8_t data) {
-    std::cout << "[SPI TRANSFER] Sent: " << static_cast<int>(data)
-              << " Received: " << static_cast<int>(lastData) << std::endl;
+// void I2C::write(uint8_t address, uint8_t data) {
+//     std::cout << "[I2C WRITE] Addr: " << static_cast<int>(address)
+//               << " Data: " << static_cast<int>(data) << std::endl;
 
-    uint8_t received = lastData;
-    lastData = data;
+//     memory[address] = data;
+// }
 
-    return received;
-}
+// uint8_t I2C::read(uint8_t address) {
+//     std::cout << "[I2C READ] Addr: " << static_cast<int>(address)
+//               << " Data: " << static_cast<int>(memory[address]) << std::endl;
+
+//     return memory[address];
+// }
+
+// //
+// // SPI
+// //
+
+// uint8_t SPI::transfer(uint8_t data) {
+//     std::cout << "[SPI TRANSFER] Sent: " << static_cast<int>(data)
+//               << " Received: " << static_cast<int>(lastData) << std::endl;
+
+//     uint8_t received = lastData;
+//     lastData = data;
+
+//     return received;
+// }

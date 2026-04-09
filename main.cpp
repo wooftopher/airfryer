@@ -13,6 +13,11 @@
 #include "clock.hpp"
 #include "protocol.hpp"
 
+
+std::queue<Input> eventQueue;
+std::mutex queueMutex;
+std::atomic<bool> running = true;
+
 struct SystemState {
     bool power = false;
     bool heating = false;
@@ -36,6 +41,49 @@ void resetSystem(SystemState& state, Heater& heater) {
     heater.setTargetTemp(0);
 
     std::cout << "SYSTEM RESET\n";
+}
+
+void simulateUART(UART& uart)
+{
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    uart.injectRX("POWER");
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    uart.injectRX("TEMP_100");
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    uart.injectRX("START");
+}
+
+Input parseUARTCommand(const std::string& cmd)
+{
+    if (cmd == "POWER") return Input::POWER;
+    if (cmd == "START") return Input::START;
+    if (cmd == "STOP") return Input::STOP;
+    if (cmd == "TEMP_100") return Input::SET_TEMP_100;
+    if (cmd == "TEMP_50") return Input::SET_TEMP_50;
+
+    return Input::NONE;
+}
+
+void uartTask(UART& uart)
+{
+    while (true)
+    {
+        if (uart.available())
+        {
+            std::string msg = uart.read();
+            Input input = parseUARTCommand(msg);
+
+            if (input != Input::NONE)
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                eventQueue.push(input);
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
 }
 
 void handleInput(Input input, SystemState& state, Heater& heater) {
@@ -62,52 +110,34 @@ void handleInput(Input input, SystemState& state, Heater& heater) {
         case Input::START:
             state.heating = true;
             heater.setTargetTemp(state.targetTemp);
+            std::cout << "HEATING STARTED\n";
             break;
 
         case Input::STOP:
             state.heating = false;
             heater.setTargetTemp(0);
+            std::cout << "HEATING STOPPED\n";
             break;
 
-        case Input::SET_TEMP:
-            state.enteringTemp = true;
-            state.enteringTime = false;
-            state.inputBuffer = 0;
+        case Input::SET_TEMP_50:
+            state.targetTemp = 50;
+            std::cout << "TEMP SET TO 50\n";
             break;
 
-        case Input::SET_TIME:
-            state.enteringTime = true;
-            state.enteringTemp = false;
-            state.inputBuffer = 0;
+        case Input::SET_TEMP_100:
+            state.targetTemp = 100;
+            std::cout << "TEMP SET TO 100\n";
             break;
 
-        case Input::ENTER:
-            if (state.enteringTemp) {
-                state.targetTemp = state.inputBuffer;
-                state.enteringTemp = false;
-            }
-            else if (state.enteringTime) {
-                state.targetTime = state.inputBuffer;
-                state.enteringTime = false;
-            }
-            state.inputBuffer = 0;
+        case Input::SET_TEMP_150:
+            state.targetTime = 150;
+            std::cout << "TIME SET TO 150\n";
             break;
 
         default:
-            if (input >= Input::DIGIT_0 && input <= Input::DIGIT_9) {
-                int digit = static_cast<int>(input) - static_cast<int>(Input::DIGIT_0);
-                state.inputBuffer = state.inputBuffer * 10 + digit;
-
-                std::cout << "BUFFER: " << state.inputBuffer << std::endl;
-            }
             break;
     }
 }
-
-std::queue<Input> eventQueue;
-std::mutex queueMutex;
-std::atomic<bool> running = true;
-
 
 void inputThread(Keypad& keypad) {
     while (running) {
@@ -122,14 +152,17 @@ int main() {
     Keypad keypad;
     Heater heater;
     SystemState state;
+    UART uart;
 
     std::thread t(inputThread, std::ref(keypad));
+
+    std::thread uartSimThread(simulateUART, std::ref(uart));
+    std::thread uartTaskThread(uartTask, std::ref(uart));
 
     auto lastPrint = std::chrono::steady_clock::now();
 
     while (true) {
 
-        // 🔥 process "interrupts"
         {
             std::lock_guard<std::mutex> lock(queueMutex);
 
@@ -141,17 +174,22 @@ int main() {
             }
         }
 
-        heater.update();
+        if (state.power) {
+            heater.update();
 
-        auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - lastPrint).count() >= 3) {
-            std::cout << "TEMP: " << heater.getTemp() << std::endl;
-            lastPrint = now;
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastPrint).count() >= 3) {
+                std::cout << "TEMP: " << heater.getTemp() << std::endl;
+                lastPrint = now;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
     running = false;
+
     t.join();
+    uartSimThread.join();
+    uartTaskThread.join();
 }

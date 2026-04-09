@@ -2,36 +2,38 @@
 
 #include <cstdint>
 #include <string>
-
-enum class Command : uint8_t {
-    SET_TEMP,
-    START,
-    STOP,
-    SET_TIMER
-};
+#include <queue>
 
 class UART {
 public:
     void send(const std::string& msg);
-    std::string receive();
+
+    // simulate incoming data (like hardware RX interrupt)
+    void injectRX(const std::string& msg);
+
+    // check if data is available
+    bool available();
+
+    // read one message
+    std::string read();
 
 private:
-    std::string buffer;
+    std::queue<std::string> rxQueue;
 };
 
-class I2C {
-public:
-    void write(uint8_t address, uint8_t data);
-    uint8_t read(uint8_t address);
+// class I2C {
+// public:
+//     void write(uint8_t address, uint8_t data);
+//     uint8_t read(uint8_t address);
 
-private:
-    uint8_t memory[256] = {0}; // simple addressable space
-};
+// private:
+//     uint8_t memory[256] = {0}; // simple addressable space
+// };
 
-class SPI {
-public:
-    uint8_t transfer(uint8_t data);
+// class SPI {
+// public:
+//     uint8_t transfer(uint8_t data);
 
-private:
-    uint8_t lastData = 0;
-};
+// private:
+//     uint8_t lastData = 0;
+// };
