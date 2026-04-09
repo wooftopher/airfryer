@@ -3,8 +3,7 @@ CXXFLAGS = -Wall -Wextra -std=c++20
 
 TARGET = airfryer
 
-SRC = main.cpp keypad.cpp 
-# heater.cpp clock.cpp protocol.cpp
+SRC = main.cpp keypad.cpp heater.cpp clock.cpp protocol.cpp
 
 OBJ = $(SRC:.cpp=.o)
 

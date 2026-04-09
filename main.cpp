@@ -11,13 +11,13 @@
 
 int main() {
     Keypad keypad;
-    // Heater heater;
-    // Clock clock;
+    Heater heater;
+    Clock clock;
 
     while (true) {
         keypad.update();
-        // heater.update();
-        // clock.update();
+        heater.update();
+        clock.update();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
