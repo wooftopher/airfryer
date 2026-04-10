@@ -25,18 +25,13 @@ struct SystemState {
     int targetTemp = 0;
     int targetTime = 0;
 
-    int inputBuffer = 0;
-    bool enteringTemp = false;
-    bool enteringTime = false;
+    int clockTick = 0;
 };
 
 void resetSystem(SystemState& state, Heater& heater) {
     state.heating = false;
     state.targetTemp = 25;
     state.targetTime = 0;
-    state.inputBuffer = 0;
-    state.enteringTemp = false;
-    state.enteringTime = false;
 
     heater.setTargetTemp(0);
 
@@ -141,10 +136,26 @@ void handleInput(Input input, SystemState& state, Heater& heater) {
 
 void inputThread(Keypad& keypad) {
     while (running) {
-        Input in = keypad.getKey(); // blocking is OK HERE
+        Input in = keypad.getKey();
 
         std::lock_guard<std::mutex> lock(queueMutex);
         eventQueue.push(in);
+    }
+}
+
+void timerInterrupt(SystemState& state, Heater& heater)
+{
+    while (true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        // "timer interrupt"
+        if (state.power)
+        {
+            heater.update();
+        }
+
+        state.clockTick++;
     }
 }
 
@@ -155,14 +166,15 @@ int main() {
     UART uart;
 
     std::thread t(inputThread, std::ref(keypad));
-
     std::thread uartSimThread(simulateUART, std::ref(uart));
     std::thread uartTaskThread(uartTask, std::ref(uart));
+    std::thread timerThread(timerInterrupt, std::ref(state), std::ref(heater));
 
     auto lastPrint = std::chrono::steady_clock::now();
 
     while (true) {
 
+        // 🔥 process events (interrupt queue)
         {
             std::lock_guard<std::mutex> lock(queueMutex);
 
@@ -175,9 +187,9 @@ int main() {
         }
 
         if (state.power) {
-            heater.update();
 
             auto now = std::chrono::steady_clock::now();
+
             if (std::chrono::duration_cast<std::chrono::seconds>(now - lastPrint).count() >= 3) {
                 std::cout << "TEMP: " << heater.getTemp() << std::endl;
                 lastPrint = now;
@@ -192,4 +204,6 @@ int main() {
     t.join();
     uartSimThread.join();
     uartTaskThread.join();
+    timerThread.join();
 }
+
